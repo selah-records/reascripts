@@ -107,44 +107,75 @@ local function add_to_folder(index, children)
 	deselect_all_tracks()
 end
 
-for _, group in ipairs(Schema) do
-	local children = {}
-	for _, pattern in ipairs(group.patterns) do
-		pattern = string.upper(pattern)
-		local folder_depth = 0
-		for i = 0, reaper.GetNumTracks() - 1 do
-			track = reaper.GetTrack(0, i)
-			folder_depth = folder_depth + reaper.GetMediaTrackInfo_Value(track, "I_FOLDERDEPTH")
-			_, state = reaper.GetTrackState(track)
-			-- Don't clean up folders
-			if (state & 1) == 0 then
-				if folder_depth == 0 then
-					ok, track_name = reaper.GetTrackName(track)
-					if ok then
-						if string.match(string.upper(track_name), pattern) then
-							reaper.SetTrackColor(track, group.color)
-							table.insert(children, track)
-						end
+---@return table
+local function index_to_folder_depth()
+	local map = {}
+	local folder_depth = 0
+	local last_depth = 0
+	for i = 0, reaper.GetNumTracks() - 1 do
+		local track = reaper.GetTrack(0, i)
+		depth = reaper.GetMediaTrackInfo_Value(track, "I_FOLDERDEPTH")
+		if depth == 1 then
+			folder_depth = folder_depth + 1
+		end
+		if depth == 0 and last_depth == 1 then
+			folder_depth = folder_depth + 1
+		end
+		if last_depth == -1 then
+			folder_depth = folder_depth - 2
+		end
+		if last_depth == -2 then
+			folder_depth = folder_depth - 3
+		end
+		map[i] = folder_depth
+		last_depth = depth
+	end
+	return map
+end
+
+local colors = { [-2] = 40000, [-1] = 0x20000, [0] = 0x256, [1] = 0x5000, [2] = 0x100, [3] = 0x600000 }
+local folder_depth = index_to_folder_depth()
+local to_add_to_folders = {}
+for _, group in pairs(Schema) do
+	to_add_to_folders[group] = {}
+end
+
+for i = 0, reaper.GetNumTracks() - 1 do
+	track = reaper.GetTrack(0, i)
+	name, _ = reaper.GetTrackState(track)
+	reaper.ShowConsoleMsg(name)
+	reaper.ShowConsoleMsg(":")
+	reaper.ShowConsoleMsg(folder_depth[i])
+	reaper.ShowConsoleMsg("\n")
+end
+
+for i = 0, reaper.GetNumTracks() - 1 do
+	-- Ignore tracks already inside a folder
+	if folder_depth[i] == 0 then
+		track = reaper.GetTrack(0, i)
+		_, track_name = reaper.GetTrackName(track)
+		for _, group in ipairs(Schema) do
+			for _, pattern in ipairs(group.patterns) do
+				if string.match(string.upper(track_name), string.upper(pattern)) then
+					reaper.SetTrackColor(track, group.color)
+					if group.bus ~= "" then
+						table.insert(to_add_to_folders[group], track)
 					end
 				end
 			end
 		end
-		if #children > 0 then
-			if group.bus ~= "" then
-				local folder_track, index = get_track_by_name(group.bus)
-				if index == -1 then
-					_, index = create_folder(group.bus, nil, group.color, 0)
-				else
-					_, state = reaper.GetTrackState(folder_track)
-					if (state & 1) == 0 then
-						_, index = create_folder(group.bus, nil, group.color, 0)
-					end
-				end
-				add_to_folder(index, children)
+	end
+end
+for group, tracks in pairs(to_add_to_folders) do
+	if #tracks > 0 then
+		local folder_track, index = get_track_by_name(bus)
+		if index == -1 then
+			_, index = create_folder(group.bus, nil, group.color, 0)
+		else
+			if folder_depth[index] == 0 then
+				_, index = create_folder(group.bus, nil, group.color, 0)
 			end
 		end
-		for k in pairs(children) do
-			children[k] = nil
-		end
+		add_to_folder(index, tracks)
 	end
 end
