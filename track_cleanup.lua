@@ -80,7 +80,17 @@ local function get_track_by_name(name)
 end
 
 ---@param name string
-local function create_vca_track(name) end
+---@param index integer
+---@param color integer
+---@return Track, integer
+local function create_vca_track(name, index, color)
+	reaper.InsertTrackAtIndex(index, false)
+	track = reaper.GetTrack(0, index)
+	reaper.SetTrackColor(track, color)
+	reaper.GetSetMediaTrackInfo_String(track, "P_NAME", name, true)
+	reaper.GetSetTrackGroupMembership(track, "VOLUME_LEAD", 1, 1)
+	return track, index
+end
 
 ---@param name string
 ---@param parent Track
@@ -95,7 +105,7 @@ local function create_folder(name, parent, color, index)
 
 	reaper.SetTrackColor(track, color)
 	reaper.SetMediaTrackInfo_Value(track, "I_FOLDERDEPTH", 0)
-	reaper.SetMediaTrackInfo_Value(track, "I_FOLDERCOMPACT", 0)
+	reaper.SetMediaTrackInfo_Value(track, "I_FOLDERCOMPACT", 1)
 	return track, index
 end
 
@@ -133,11 +143,16 @@ local function index_to_folder_depth()
 	return map
 end
 
-local colors = { [-2] = 40000, [-1] = 0x20000, [0] = 0x256, [1] = 0x5000, [2] = 0x100, [3] = 0x600000 }
+deselect_all_tracks()
+
 local folder_depth = index_to_folder_depth()
 local to_add_to_folders = {}
 for _, group in pairs(Schema) do
 	to_add_to_folders[group] = {}
+end
+local to_add_to_vcas = {}
+for _, group in pairs(Schema) do
+	to_add_to_vcas[group] = {}
 end
 
 for i = 0, reaper.GetNumTracks() - 1 do
@@ -161,6 +176,9 @@ for i = 0, reaper.GetNumTracks() - 1 do
 					if group.bus ~= "" then
 						table.insert(to_add_to_folders[group], track)
 					end
+					if group.vca ~= "" then
+						table.insert(to_add_to_vcas[group], track)
+					end
 				end
 			end
 		end
@@ -168,14 +186,30 @@ for i = 0, reaper.GetNumTracks() - 1 do
 end
 for group, tracks in pairs(to_add_to_folders) do
 	if #tracks > 0 then
-		local folder_track, index = get_track_by_name(bus)
+		local folder_track, index = get_track_by_name(group.bus)
 		if index == -1 then
 			_, index = create_folder(group.bus, nil, group.color, 0)
 		else
-			if folder_depth[index] == 0 then
+			if folder_depth[index] ~= 1 then
 				_, index = create_folder(group.bus, nil, group.color, 0)
 			end
 		end
-		add_to_folder(index, tracks)
+		for _, track in ipairs(tracks) do
+			reaper.SetTrackSelected(track, true)
+		end
+		reaper.ReorderSelectedTracks(index + 1, 1)
+		deselect_all_tracks()
+	end
+end
+for group, tracks in pairs(to_add_to_vcas) do
+	if #tracks > 0 then
+		local vca_track, index = get_track_by_name(group.vca)
+		if index == -1 then
+			vca_track = create_vca_track(group.vca, 0, group.color)
+		end
+		-- TODO: need to keep track of groups in use
+		for _, track in ipairs(tracks) do
+			reaper.GetSetTrackGroupMembership(track, "VOLUME_FOLLOW", 1, 1)
+		end
 	end
 end
