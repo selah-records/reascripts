@@ -14,6 +14,12 @@ colors = {
 -- This type is provided by reaper, which we do not have LSP hooks for
 ---@alias Track any
 ---
+function select_all_tracks()
+	for i = 0, reaper.GetNumTracks() - 1 do
+		reaper.SetTrackSelected(reaper.GetTrack(0, i), true)
+	end
+end
+
 function deselect_all_tracks()
 	for i = 0, reaper.GetNumTracks() - 1 do
 		reaper.SetTrackSelected(reaper.GetTrack(0, i), false)
@@ -77,25 +83,15 @@ end
 ---@return table
 function index_to_folder_depth()
 	local map = {}
-	local folder_depth = 0
-	local last_depth = 0
+	-- local folder_depth = 0
+	-- local last_depth = 0
+	local depth = 0
 	for i = 0, reaper.GetNumTracks() - 1 do
 		local track = reaper.GetTrack(0, i)
-		depth = reaper.GetMediaTrackInfo_Value(track, "I_FOLDERDEPTH")
-		if depth == 1 then
-			folder_depth = folder_depth + 1
-		end
-		if depth == 0 and last_depth == 1 then
-			folder_depth = folder_depth + 1
-		end
-		if last_depth == -1 then
-			folder_depth = folder_depth - 2
-		end
-		if last_depth == -2 then
-			folder_depth = folder_depth - 3
-		end
-		map[i] = folder_depth
-		last_depth = depth
+		local name = reaper.GetTrackState(track)
+		map[i] = depth
+		local step = reaper.GetMediaTrackInfo_Value(track, "I_FOLDERDEPTH")
+		depth = depth + step
 	end
 	return map
 end

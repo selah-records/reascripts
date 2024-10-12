@@ -1,5 +1,7 @@
 local path = ({ reaper.get_action_context() })[2]:match("^.+[\\//]")
-dofile(path .. "selah-records.lua")
+dofile(path .. "lib.lua")
+
+local reaper = reaper
 
 Schema = {
 	{
@@ -9,7 +11,7 @@ Schema = {
 				patterns = { "vox", "lead" },
 			},
 			double = {
-				patterns = { "double", "wide" },
+				patterns = { "double" },
 			},
 		},
 		order = { "lead", "double" },
@@ -155,33 +157,32 @@ for _, group in ipairs(Schema) do
 	to_add_to_vcas[group] = {}
 end
 
-for i = 0, reaper.GetNumTracks() - 1 do
-	track = reaper.GetTrack(0, i)
-	name, _ = reaper.GetTrackState(track)
-	-- reaper.ShowConsoleMsg(name)
-	-- reaper.ShowConsoleMsg(":")
-	-- reaper.ShowConsoleMsg(folder_depth[i])
-	-- reaper.ShowConsoleMsg("\n")
-end
-
 reaper.Undo_BeginBlock()
 for i = 0, reaper.GetNumTracks() - 1 do
+	local skip = false
 	-- Ignore tracks already inside a folder
 	if folder_depth[i] == 0 then
-		track = reaper.GetTrack(0, i)
-		_, track_name = reaper.GetTrackName(track)
+		local track = reaper.GetTrack(0, i)
+		local _, track_name = reaper.GetTrackName(track)
 		for _, group in ipairs(Schema) do
-			for _, component_name in ipairs(group.order) do
-				for _, pattern in ipairs(group.components[component_name].patterns) do
-					if string.match(string.upper(track_name), string.upper(pattern)) then
-						reaper.SetTrackColor(track, reaper.ColorToNative(table.unpack(group.color)))
-						reaper.GetSetMediaTrackInfo_String(track, "P_NAME", format_track_name(track_name), true)
-						reaper.SetMediaTrackInfo_Value(track, "B_SHOWINMIXER", 0)
-						if group.folder ~= "" then
-							table.insert(to_add_to_folders[group], track)
-						end
-						if group.vca ~= "" then
-							table.insert(to_add_to_vcas[group], track)
+			if track_name == group.folder then
+				skip = true
+			end
+		end
+		if skip == false then
+			for _, group in ipairs(Schema) do
+				for _, component_name in ipairs(group.order) do
+					for _, pattern in ipairs(group.components[component_name].patterns) do
+						if string.match(string.upper(track_name), string.upper(pattern)) then
+							reaper.SetTrackColor(track, reaper.ColorToNative(table.unpack(group.color)))
+							reaper.GetSetMediaTrackInfo_String(track, "P_NAME", format_track_name(track_name), true)
+							reaper.SetMediaTrackInfo_Value(track, "B_SHOWINMIXER", 0)
+							if group.folder ~= "" then
+								table.insert(to_add_to_folders[group], track)
+							end
+							if group.vca ~= "" then
+								table.insert(to_add_to_vcas[group], track)
+							end
 						end
 					end
 				end
@@ -189,7 +190,6 @@ for i = 0, reaper.GetNumTracks() - 1 do
 		end
 	end
 end
--- for _, group in ipairs(Schema) do
 for i = #Schema - 1, 1, -1 do
 	local group = Schema[i]
 	local tracks = to_add_to_folders[group]
@@ -198,7 +198,7 @@ for i = #Schema - 1, 1, -1 do
 		if index == -1 then
 			_, index = create_folder(group.folder, nil, reaper.ColorToNative(table.unpack(group.color)), 0)
 		else
-			if folder_depth[index] ~= 1 then
+			if folder_depth[index] ~= 0 then
 				_, index = create_folder(group.folder, nil, reaper.ColorToNative(table.unpack(group.color)), 0)
 			end
 		end
@@ -209,15 +209,14 @@ for i = #Schema - 1, 1, -1 do
 		deselect_all_tracks()
 	end
 end
-for _, group in ipairs(Schema) do
-	-- for i = #Schema - 1, 1, -1 do
-	-- local group = Schema[i]
+for i = #Schema - 1, 1, -1 do
 	local tracks = to_add_to_vcas[group]
+	local group = Schema[i]
 	for _, tracks in ipairs(to_add_to_vcas[group]) do
 		if #tracks > 0 then
-			local vca_track, index = get_track_by_name(group.vca)
+			local _, index = get_track_by_name(group.vca)
 			if index == -1 then
-				vca_track = create_vca_track(group.vca, 0, reaper.ColorToNative(table.unpack(group.color)))
+				_ = create_vca_track(group.vca, 0, reaper.ColorToNative(table.unpack(group.color)))
 			end
 			-- TODO: need to keep track of groups in use
 			for _, track in ipairs(tracks) do
