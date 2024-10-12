@@ -1,52 +1,65 @@
+local colors = {
+	black = { 84, 84, 84 },
+	blue = { 28, 101, 199 },
+	lavender = { 144, 114, 156 },
+	grey = { 168, 168, 168 },
+	teal = { 19, 189, 153 },
+	dark_teal = { 51, 152, 135 },
+	brown = { 184, 143, 63 },
+	rose = { 187, 156, 148 },
+	dark_red = { 134, 94, 82 },
+	brick = { 130, 59, 42 },
+}
+
 Schema = {
 	{
 		patterns = { "snare", "kick", "overhead", "oh", "tom", "ride" },
-		color = 0x256,
+		color = colors.brown,
 		-- icon = "icon.png",
 		vca = "",
-		bus = "Drum Bus",
+		folder = "Drums",
 	},
 	{
 		patterns = { "vox", "vocal" },
-		color = 0x450,
+		color = colors.blue,
 		-- icon = "icon.png",
-		vca = "VOX_vca",
-		bus = "",
+		vca = "",
+		folder = "Vox",
 	},
 	{
 		patterns = { "bgv", "background", "backing" },
-		color = 0x5000,
+		color = colors.lavender,
 		-- icon = "icon.png",
-		vca = "VOX_vca",
-		bus = "BGV",
+		vca = "",
+		folder = "BGVs",
 	},
 	{
 		patterns = { "bass", "sub", "808", "909" },
-		color = 0x100,
+		color = colors.dark_red,
 		-- icon = "icon.png",
-		vca = "BASS_vca",
-		bus = "",
+		vca = "",
+		folder = "Bass",
 	},
 	{
 		patterns = { "guitar", "acoustic", "electric" },
-		color = 0x600,
+		color = colors.teal,
 		-- icon = "icon.png",
-		vca = "GUITAR_vca",
-		bus = "",
+		vca = "",
+		folder = "Guitars",
 	},
 	{
 		patterns = { "synth", "moog", "pad", "arp", "juno", "saw" },
-		color = 0x600,
+		color = colors.rose,
 		-- icon = "icon.png",
-		vca = "SYNTH_vca",
-		bus = "",
+		vca = "",
+		folder = "Synths",
 	},
 	{
 		patterns = { "fx", "effect", "riser", "drop" },
-		color = 0x600,
+		color = colors.grey,
 		-- icon = "icon.png",
-		vca = "FX_vca",
-		bus = "FX",
+		vca = "",
+		folder = "FX",
 	},
 }
 
@@ -158,12 +171,13 @@ end
 for i = 0, reaper.GetNumTracks() - 1 do
 	track = reaper.GetTrack(0, i)
 	name, _ = reaper.GetTrackState(track)
-	reaper.ShowConsoleMsg(name)
-	reaper.ShowConsoleMsg(":")
-	reaper.ShowConsoleMsg(folder_depth[i])
-	reaper.ShowConsoleMsg("\n")
+	-- reaper.ShowConsoleMsg(name)
+	-- reaper.ShowConsoleMsg(":")
+	-- reaper.ShowConsoleMsg(folder_depth[i])
+	-- reaper.ShowConsoleMsg("\n")
 end
 
+reaper.Undo_BeginBlock()
 for i = 0, reaper.GetNumTracks() - 1 do
 	-- Ignore tracks already inside a folder
 	if folder_depth[i] == 0 then
@@ -172,8 +186,8 @@ for i = 0, reaper.GetNumTracks() - 1 do
 		for _, group in ipairs(Schema) do
 			for _, pattern in ipairs(group.patterns) do
 				if string.match(string.upper(track_name), string.upper(pattern)) then
-					reaper.SetTrackColor(track, group.color)
-					if group.bus ~= "" then
+					reaper.SetTrackColor(track, reaper.ColorToNative(table.unpack(group.color)))
+					if group.folder ~= "" then
 						table.insert(to_add_to_folders[group], track)
 					end
 					if group.vca ~= "" then
@@ -186,12 +200,12 @@ for i = 0, reaper.GetNumTracks() - 1 do
 end
 for group, tracks in pairs(to_add_to_folders) do
 	if #tracks > 0 then
-		local folder_track, index = get_track_by_name(group.bus)
+		local folder_track, index = get_track_by_name(group.folder)
 		if index == -1 then
-			_, index = create_folder(group.bus, nil, group.color, 0)
+			_, index = create_folder(group.folder, nil, reaper.ColorToNative(table.unpack(group.color)), 0)
 		else
 			if folder_depth[index] ~= 1 then
-				_, index = create_folder(group.bus, nil, group.color, 0)
+				_, index = create_folder(group.folder, nil, reaper.ColorToNative(table.unpack(group.color)), 0)
 			end
 		end
 		for _, track in ipairs(tracks) do
@@ -205,7 +219,7 @@ for group, tracks in pairs(to_add_to_vcas) do
 	if #tracks > 0 then
 		local vca_track, index = get_track_by_name(group.vca)
 		if index == -1 then
-			vca_track = create_vca_track(group.vca, 0, group.color)
+			vca_track = create_vca_track(group.vca, 0, reaper.ColorToNative(table.unpack(group.color)))
 		end
 		-- TODO: need to keep track of groups in use
 		for _, track in ipairs(tracks) do
@@ -213,3 +227,4 @@ for group, tracks in pairs(to_add_to_vcas) do
 		end
 	end
 end
+reaper.Undo_EndBlock("clean up tracks", 0)
