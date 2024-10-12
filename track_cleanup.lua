@@ -66,9 +66,6 @@ Schema = {
 -- This type is provided by reaper, which we do not have LSP hooks for
 ---@alias Track any
 
-local vca_color = 0x900
-local default_bus_color = 0x800
-
 local function deselect_all_tracks()
 	for i = 0, reaper.GetNumTracks() - 1 do
 		reaper.SetTrackSelected(reaper.GetTrack(0, i), false)
@@ -156,6 +153,30 @@ local function index_to_folder_depth()
 	return map
 end
 
+---@param  str string
+---@return string
+local function upper_first(str)
+	return (str:gsub("^%l", string.upper))
+end
+
+---@param track_name string
+---@return string
+local function format_track_name(name)
+	local sep = " "
+	local parts = {}
+	for part in string.gmatch(name, "([^" .. sep .. "]+)") do
+		table.insert(parts, part)
+	end
+	local formatted_name = ""
+	for _, part in ipairs(parts) do
+		formatted_name = formatted_name .. upper_first(part)
+	end
+	return formatted_name
+end
+
+------------------------
+-- Script begins here
+------------------------
 deselect_all_tracks()
 
 local folder_depth = index_to_folder_depth()
@@ -187,6 +208,7 @@ for i = 0, reaper.GetNumTracks() - 1 do
 			for _, pattern in ipairs(group.patterns) do
 				if string.match(string.upper(track_name), string.upper(pattern)) then
 					reaper.SetTrackColor(track, reaper.ColorToNative(table.unpack(group.color)))
+					reaper.GetSetMediaTrackInfo_String(track, "P_NAME", format_track_name(track_name), true)
 					if group.folder ~= "" then
 						table.insert(to_add_to_folders[group], track)
 					end
