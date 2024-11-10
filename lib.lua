@@ -1,3 +1,5 @@
+local reaper = reaper
+
 colors = {
 	black = { 84, 84, 84 },
 	blue = { 28, 101, 199 },
@@ -10,6 +12,16 @@ colors = {
 	dark_red = { 134, 94, 82 },
 	brick = { 130, 59, 42 },
 }
+
+function Contains(tab, val)
+	for index, value in ipairs(tab) do
+		if value == val then
+			return true
+		end
+	end
+
+	return false
+end
 
 -- This type is provided by reaper, which we do not have LSP hooks for
 ---@alias Track any
@@ -41,6 +53,17 @@ function get_track_by_name(name)
 		end
 	end
 	return nil, -1
+end
+
+---@param track Track
+---@return integer
+function Get_track_index(track)
+	for i = 0, reaper.GetNumTracks() - 1 do
+		if reaper.GetTrack(0, i) == track then
+			return i
+		end
+	end
+	return -1
 end
 
 ---@param name string
@@ -94,4 +117,29 @@ function index_to_folder_depth()
 		depth = depth + step
 	end
 	return map
+end
+
+---@return table
+function List_au()
+	local list = {}
+	local path = reaper.GetResourcePath()
+	local au_file = path .. "/reaper-auplugins_arm64.ini"
+	if not reaper.file_exists(au_file) then
+		reaper.ShowConsoleMsg("Ini file does not exist: " .. au_file .. "/")
+		return list
+	end
+	local i = 1
+	for line in io.lines(au_file) do
+		if i == 1 and line ~= "[auplugins]" then
+			reaper.ShowConsoleMsg("Error: first line of AU ini file does not match; aborting!\n")
+			return list
+		else
+			local vendor, name, instrument = line:match("^(.-): (.+)=(.+)$")
+			if name then
+				table.insert(list, name)
+			end
+		end
+		i = i + 1
+	end
+	return list
 end
