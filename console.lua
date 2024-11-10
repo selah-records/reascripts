@@ -33,7 +33,6 @@ local console_allow_list = {
 local console_channel = "Console7Channel"
 local console_buss = "Console7Channel"
 
--- Enumerate everything that sends to stereo out
 ---@return table
 function Get_tracks_routed_to_master()
 	local tracks = {}
@@ -41,22 +40,12 @@ function Get_tracks_routed_to_master()
 		local track = reaper.GetTrack(0, track_idx)
 		if reaper.GetMediaTrackInfo_Value(track, "B_MAINSEND") == 1 then
 			table.insert(tracks, track)
-		else
-			-- local num_sends = reaper.GetTrackNumSends(track, 0)
-			-- for send_idx = 0, num_sends - 1 do
-			-- 	local dest = reaper.GetTrackSendInfo_Value(track, 0, send_idx, "P_DESTTRACK")
-			-- 	if dest == mt then
-			-- 		reaper.ShowConsoleMsg("Track sends to master on send " .. send_idx .. "\n")
-			-- 		table.insert(tracks, track)
-			-- 	end
-			-- end
 		end
 	end
 	return tracks
 end
 
--- Check for console sum buss. If it exists, enumerate everthing that sends to that
----@return Track, boolean
+---@return Track, boolean, boolean
 function Get_pfcb_sum_track()
 	local hits = 0
 	local sum_bus = nil
@@ -69,23 +58,25 @@ function Get_pfcb_sum_track()
 			sum_bus = track
 
 			if reaper.GetMediaTrackInfo_Value(track, "B_MAINSEND") == 0 then
-				reaper.ShowConsoleMsg(
-					"Error: sum buss is not routed to master send. Sum bus must be routed to master send.\n"
+				reaper.ShowMessageBox(
+					"Error: sum buss is not routed to master send. Sum bus must be routed to master send.\n",
+					"Error",
+					0
 				)
-				return nil, false
+				return nil, false, false
 			end
 		end
 	end
 
 	if hits == 0 then
-		return nil, false
+		return nil, false, true
 	end
 	if hits > 1 then
-		reaper.ShowConsoleMsg("Error: found " .. hits .. " sum busses! There should only be one.\n")
-		return nil, false
+		reaper.ShowMessageBox("Error: found " .. hits .. " sum busses! There should only be one.\n", "Error", 0)
+		return nil, false, false
 	end
 
-	return sum_bus, true
+	return sum_bus, true, true
 end
 
 ---@param dest Track
